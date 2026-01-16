@@ -27,7 +27,7 @@ chmod +x install.sh
 The installer will:
 1. Detect your package manager
 2. Install system dependencies
-3. Install Python dependencies via Poetry
+3. Install Python dependencies via uv
 4. Set up the config file
 5. Optionally install as a systemd service
 
@@ -35,17 +35,19 @@ The installer will:
 
 ```bash
 # Ubuntu/Debian
-sudo apt install alsa-utils xclip xdotool libnotify-bin
+sudo apt install alsa-utils xdotool libnotify-bin xclip wl-clipboard
 
 # Fedora
-sudo dnf install alsa-utils xclip xdotool libnotify
+sudo dnf install alsa-utils xdotool libnotify xclip wl-clipboard
 
 # Arch
-sudo pacman -S alsa-utils xclip xdotool libnotify
+sudo pacman -S alsa-utils xdotool libnotify xclip wl-clipboard
 
 # Then install Python deps
 uv sync
 ```
+
+Note: xclip is for X11, wl-clipboard is for Wayland. Install both for maximum compatibility, or just the one for your display server.
 
 ### GPU Support (Optional)
 

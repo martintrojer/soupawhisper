@@ -5,6 +5,7 @@ Hold the hotkey to record, release to transcribe and copy to clipboard.
 """
 
 import argparse
+import base64
 import configparser
 import subprocess
 import tempfile
@@ -70,6 +71,29 @@ DEVICE = CONFIG["device"]
 COMPUTE_TYPE = CONFIG["compute_type"]
 AUTO_TYPE = CONFIG["auto_type"]
 NOTIFICATIONS = CONFIG["notifications"]
+
+
+def copy_to_clipboard(text):
+    """Copy text to clipboard using OSC52, then fallback to wl-copy or xclip."""
+    # Try OSC52 first (works in terminals that support it)
+    encoded = base64.b64encode(text.encode()).decode()
+    sys.stdout.write(f"\033]52;c;{encoded}\007")
+    sys.stdout.flush()
+
+    # Also copy via native clipboard tools for non-terminal contexts
+    if os.environ.get("WAYLAND_DISPLAY"):
+        # Wayland: use wl-copy
+        if subprocess.run(["which", "wl-copy"], capture_output=True).returncode == 0:
+            process = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
+            process.communicate(input=text.encode())
+    elif os.environ.get("DISPLAY"):
+        # X11: use xclip
+        if subprocess.run(["which", "xclip"], capture_output=True).returncode == 0:
+            process = subprocess.Popen(
+                ["xclip", "-selection", "clipboard"],
+                stdin=subprocess.PIPE
+            )
+            process.communicate(input=text.encode())
 
 
 class Dictation:
@@ -176,12 +200,8 @@ class Dictation:
             text = " ".join(segment.text.strip() for segment in segments)
 
             if text:
-                # Copy to clipboard using xclip
-                process = subprocess.Popen(
-                    ["xclip", "-selection", "clipboard"],
-                    stdin=subprocess.PIPE
-                )
-                process.communicate(input=text.encode())
+                # Copy to clipboard using OSC52
+                copy_to_clipboard(text)
 
                 # Type it into the active input field
                 if AUTO_TYPE:
@@ -226,10 +246,8 @@ def check_dependencies():
     """Check that required system commands are available."""
     missing = []
 
-    for cmd in ["arecord", "xclip"]:
-        if subprocess.run(["which", cmd], capture_output=True).returncode != 0:
-            pkg = "alsa-utils" if cmd == "arecord" else cmd
-            missing.append((cmd, pkg))
+    if subprocess.run(["which", "arecord"], capture_output=True).returncode != 0:
+        missing.append(("arecord", "alsa-utils"))
 
     if AUTO_TYPE:
         if subprocess.run(["which", "xdotool"], capture_output=True).returncode != 0:
