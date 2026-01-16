@@ -15,9 +15,19 @@ uv sync
 # Run the application
 uv run python dictate.py
 
-# Run with version info
-uv run python dictate.py -v
+# Run with debug logging
+uv run python dictate.py -d
+
+# Lint and format
+uv run ruff check --fix .
+uv run ruff format .
 ```
+
+## Code Quality
+
+This codebase is kept **ruff clean**. Before committing, ensure:
+- `uv run ruff check .` passes with no errors
+- `uv run ruff format --check .` shows no files need reformatting
 
 ## Architecture
 

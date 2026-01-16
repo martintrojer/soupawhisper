@@ -24,10 +24,7 @@ from faster_whisper import WhisperModel
 __version__ = "0.1.0"
 
 # Setup logging
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(levelname)s: %(message)s"
-)
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Load configuration
@@ -53,7 +50,9 @@ def load_config():
     return {
         "model": config.get("whisper", "model", fallback=defaults["model"]),
         "device": config.get("whisper", "device", fallback=defaults["device"]),
-        "compute_type": config.get("whisper", "compute_type", fallback=defaults["compute_type"]),
+        "compute_type": config.get(
+            "whisper", "compute_type", fallback=defaults["compute_type"]
+        ),
         "key": config.get("hotkey", "key", fallback=defaults["key"]),
         "auto_type": config.getboolean("behavior", "auto_type", fallback=True),
         "notifications": config.getboolean("behavior", "notifications", fallback=True),
@@ -65,13 +64,27 @@ CONFIG = load_config()
 
 # Map key names to evdev key codes
 KEY_MAP = {
-    "f1": ecodes.KEY_F1, "f2": ecodes.KEY_F2, "f3": ecodes.KEY_F3, "f4": ecodes.KEY_F4,
-    "f5": ecodes.KEY_F5, "f6": ecodes.KEY_F6, "f7": ecodes.KEY_F7, "f8": ecodes.KEY_F8,
-    "f9": ecodes.KEY_F9, "f10": ecodes.KEY_F10, "f11": ecodes.KEY_F11, "f12": ecodes.KEY_F12,
-    "scroll_lock": ecodes.KEY_SCROLLLOCK, "pause": ecodes.KEY_PAUSE,
-    "insert": ecodes.KEY_INSERT, "home": ecodes.KEY_HOME, "end": ecodes.KEY_END,
-    "pageup": ecodes.KEY_PAGEUP, "pagedown": ecodes.KEY_PAGEDOWN,
-    "capslock": ecodes.KEY_CAPSLOCK, "numlock": ecodes.KEY_NUMLOCK,
+    "f1": ecodes.KEY_F1,
+    "f2": ecodes.KEY_F2,
+    "f3": ecodes.KEY_F3,
+    "f4": ecodes.KEY_F4,
+    "f5": ecodes.KEY_F5,
+    "f6": ecodes.KEY_F6,
+    "f7": ecodes.KEY_F7,
+    "f8": ecodes.KEY_F8,
+    "f9": ecodes.KEY_F9,
+    "f10": ecodes.KEY_F10,
+    "f11": ecodes.KEY_F11,
+    "f12": ecodes.KEY_F12,
+    "scroll_lock": ecodes.KEY_SCROLLLOCK,
+    "pause": ecodes.KEY_PAUSE,
+    "insert": ecodes.KEY_INSERT,
+    "home": ecodes.KEY_HOME,
+    "end": ecodes.KEY_END,
+    "pageup": ecodes.KEY_PAGEUP,
+    "pagedown": ecodes.KEY_PAGEDOWN,
+    "capslock": ecodes.KEY_CAPSLOCK,
+    "numlock": ecodes.KEY_NUMLOCK,
 }
 
 
@@ -129,8 +142,7 @@ def copy_to_clipboard(text):
         if subprocess.run(["which", "xclip"], capture_output=True).returncode == 0:
             logger.debug("Running: xclip -selection clipboard")
             process = subprocess.Popen(
-                ["xclip", "-selection", "clipboard"],
-                stdin=subprocess.PIPE
+                ["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE
             )
             process.communicate(input=text.encode())
 
@@ -162,20 +174,27 @@ def get_record_command(output_file):
     if recorder == "pipewire":
         return [
             "pw-record",
-            "--format", "s16",      # 16-bit signed
-            "--rate", "16000",      # Sample rate: 16kHz (what Whisper expects)
-            "--channels", "1",      # Mono
-            output_file
+            "--format",
+            "s16",  # 16-bit signed
+            "--rate",
+            "16000",  # Sample rate: 16kHz (what Whisper expects)
+            "--channels",
+            "1",  # Mono
+            output_file,
         ]
     else:
         # ALSA fallback
         return [
             "arecord",
-            "-f", "S16_LE",         # Format: 16-bit little-endian
-            "-r", "16000",          # Sample rate: 16kHz (what Whisper expects)
-            "-c", "1",              # Mono
-            "-t", "wav",
-            output_file
+            "-f",
+            "S16_LE",  # Format: 16-bit little-endian
+            "-r",
+            "16000",  # Sample rate: 16kHz (what Whisper expects)
+            "-c",
+            "1",  # Mono
+            "-t",
+            "wav",
+            output_file,
         ]
 
 
@@ -216,10 +235,12 @@ class Dictation:
 
     def _load_model(self):
         try:
-            self.model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
+            self.model = WhisperModel(
+                MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE
+            )
             self.model_loaded.set()
             hotkey_name = get_key_name(HOTKEY)
-            print(f"Model loaded. Ready for dictation!")
+            print("Model loaded. Ready for dictation!")
             print(f"Hold [{hotkey_name}] to record, release to transcribe.")
             print("Press Ctrl+C to quit.")
         except Exception as e:
@@ -227,7 +248,9 @@ class Dictation:
             self.model_loaded.set()
             print(f"Failed to load model: {e}")
             if "cudnn" in str(e).lower() or "cuda" in str(e).lower():
-                print("Hint: Try setting device = cpu in your config, or install cuDNN (NVIDIA) / ROCm (AMD).")
+                print(
+                    "Hint: Try setting device = cpu in your config, or install cuDNN (NVIDIA) / ROCm (AMD)."
+                )
 
     def notify(self, title, message, icon="dialog-information", timeout=2000):
         """Send a desktop notification."""
@@ -236,14 +259,18 @@ class Dictation:
         subprocess.run(
             [
                 "notify-send",
-                "-a", "SoupaWhisper",
-                "-i", icon,
-                "-t", str(timeout),
-                "-h", "string:x-canonical-private-synchronous:soupawhisper",
+                "-a",
+                "SoupaWhisper",
+                "-i",
+                icon,
+                "-t",
+                str(timeout),
+                "-h",
+                "string:x-canonical-private-synchronous:soupawhisper",
                 title,
-                message
+                message,
             ],
-            capture_output=True
+            capture_output=True,
         )
 
     def start_recording(self):
@@ -258,13 +285,16 @@ class Dictation:
         record_cmd = get_record_command(self.temp_file.name)
         logger.debug(f"Running: {' '.join(record_cmd)}")
         self.record_process = subprocess.Popen(
-            record_cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            record_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         print("Recording...")
         hotkey_name = get_key_name(HOTKEY)
-        self.notify("Recording...", f"Release {hotkey_name} when done", "audio-input-microphone", 30000)
+        self.notify(
+            "Recording...",
+            f"Release {hotkey_name} when done",
+            "audio-input-microphone",
+            30000,
+        )
 
     def stop_recording(self):
         if not self.recording:
@@ -278,13 +308,15 @@ class Dictation:
             self.record_process = None
 
         print("Transcribing...")
-        self.notify("Transcribing...", "Processing your speech", "emblem-synchronizing", 30000)
+        self.notify(
+            "Transcribing...", "Processing your speech", "emblem-synchronizing", 30000
+        )
 
         # Wait for model if not loaded yet
         self.model_loaded.wait()
 
         if self.model_error:
-            print(f"Cannot transcribe: model failed to load")
+            print("Cannot transcribe: model failed to load")
             self.notify("Error", "Model failed to load", "dialog-error", 3000)
             return
 
@@ -307,10 +339,17 @@ class Dictation:
                     type_text(text)
 
                 print(f"Copied: {text}")
-                self.notify("Copied!", text[:100] + ("..." if len(text) > 100 else ""), "emblem-ok-symbolic", 3000)
+                self.notify(
+                    "Copied!",
+                    text[:100] + ("..." if len(text) > 100 else ""),
+                    "emblem-ok-symbolic",
+                    3000,
+                )
             else:
                 print("No speech detected")
-                self.notify("No speech detected", "Try speaking louder", "dialog-warning", 2000)
+                self.notify(
+                    "No speech detected", "Try speaking louder", "dialog-warning", 2000
+                )
 
         except Exception as e:
             print(f"Error: {e}")
@@ -379,7 +418,10 @@ def check_dependencies():
                 missing.append(("wtype", "wtype"))
         else:
             # X11: need xdotool
-            if subprocess.run(["which", "xdotool"], capture_output=True).returncode != 0:
+            if (
+                subprocess.run(["which", "xdotool"], capture_output=True).returncode
+                != 0
+            ):
                 missing.append(("xdotool", "xdotool"))
 
     if missing:
@@ -394,14 +436,10 @@ def main():
         description="SoupaWhisper - Push-to-talk voice dictation"
     )
     parser.add_argument(
-        "-v", "--version",
-        action="version",
-        version=f"SoupaWhisper {__version__}"
+        "-v", "--version", action="version", version=f"SoupaWhisper {__version__}"
     )
     parser.add_argument(
-        "-d", "--debug",
-        action="store_true",
-        help="Enable debug logging"
+        "-d", "--debug", action="store_true", help="Enable debug logging"
     )
     args = parser.parse_args()
 
@@ -415,12 +453,20 @@ def main():
         print(f"Config: using defaults (create {CONFIG_PATH} to customize)")
 
     # Log environment detection
-    display_server = "Wayland" if os.environ.get("WAYLAND_DISPLAY") else "X11" if os.environ.get("DISPLAY") else "Unknown"
+    display_server = (
+        "Wayland"
+        if os.environ.get("WAYLAND_DISPLAY")
+        else "X11"
+        if os.environ.get("DISPLAY")
+        else "Unknown"
+    )
     audio_backend = get_audio_recorder() or "None"
     logger.debug(f"Display server: {display_server}")
     logger.debug(f"Audio backend: {audio_backend}")
     logger.debug(f"Model: {MODEL_SIZE}, Device: {DEVICE}, Compute: {COMPUTE_TYPE}")
-    logger.debug(f"Hotkey: {CONFIG['key']}, Auto-type: {AUTO_TYPE}, Notifications: {NOTIFICATIONS}")
+    logger.debug(
+        f"Hotkey: {CONFIG['key']}, Auto-type: {AUTO_TYPE}, Notifications: {NOTIFICATIONS}"
+    )
 
     check_dependencies()
 
