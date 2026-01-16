@@ -6,7 +6,7 @@ A simple push-to-talk voice dictation tool for Linux using faster-whisper. Hold 
 
 - Python 3.10-3.13
 - uv
-- Linux with X11 or Wayland (ALSA audio)
+- Linux with X11 or Wayland (PipeWire or ALSA audio)
 
 ## Supported Distros
 
@@ -35,19 +35,19 @@ The installer will:
 
 ```bash
 # Ubuntu/Debian
-sudo apt install alsa-utils libnotify-bin xdotool xclip wtype wl-clipboard
+sudo apt install pipewire alsa-utils libnotify-bin xdotool xclip wtype wl-clipboard
 
 # Fedora
-sudo dnf install alsa-utils libnotify xdotool xclip wtype wl-clipboard
+sudo dnf install pipewire alsa-utils libnotify xdotool xclip wtype wl-clipboard
 
 # Arch
-sudo pacman -S alsa-utils libnotify xdotool xclip wtype wl-clipboard
+sudo pacman -S pipewire alsa-utils libnotify xdotool xclip wtype wl-clipboard
 
 # Then install Python deps
 uv sync
 ```
 
-Note: xdotool and xclip are for X11, wtype and wl-clipboard are for Wayland. Install all for maximum compatibility, or just the ones for your display server.
+Note: PipeWire (pw-record) is preferred for audio recording, with ALSA (arecord) as fallback. Most modern distros have PipeWire pre-installed. xdotool and xclip are for X11, wtype and wl-clipboard are for Wayland.
 
 ### GPU Support (Optional)
 
@@ -155,10 +155,17 @@ cp /path/to/soupawhisper/config.example.ini ~/.config/soupawhisper/config.ini
 
 **No audio recording:**
 ```bash
-# Check your input device
+# Check audio devices (PipeWire)
+pw-cli list-objects | grep -i node
+
+# Or check ALSA devices
 arecord -l
 
-# Test recording
+# Test recording with PipeWire
+pw-record --format s16 --rate 16000 --channels 1 test.wav
+# (Press Ctrl+C to stop, then play with pw-play test.wav)
+
+# Or test with ALSA
 arecord -d 3 test.wav && aplay test.wav
 ```
 

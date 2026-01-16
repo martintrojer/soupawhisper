@@ -33,20 +33,20 @@ install_deps() {
     case $pm in
         apt)
             sudo apt update
-            sudo apt install -y alsa-utils libnotify-bin xdotool xclip wtype wl-clipboard
+            sudo apt install -y pipewire alsa-utils libnotify-bin xdotool xclip wtype wl-clipboard
             ;;
         dnf)
-            sudo dnf install -y alsa-utils libnotify xdotool xclip wtype wl-clipboard
+            sudo dnf install -y pipewire alsa-utils libnotify xdotool xclip wtype wl-clipboard
             ;;
         pacman)
-            sudo pacman -S --noconfirm alsa-utils libnotify xdotool xclip wtype wl-clipboard
+            sudo pacman -S --noconfirm pipewire alsa-utils libnotify xdotool xclip wtype wl-clipboard
             ;;
         zypper)
-            sudo zypper install -y alsa-utils libnotify-tools xdotool xclip wtype wl-clipboard
+            sudo zypper install -y pipewire alsa-utils libnotify-tools xdotool xclip wtype wl-clipboard
             ;;
         *)
             echo "Unknown package manager. Please install manually:"
-            echo "  alsa-utils libnotify xdotool xclip wtype wl-clipboard"
+            echo "  pipewire alsa-utils libnotify xdotool xclip wtype wl-clipboard"
             ;;
     esac
 }

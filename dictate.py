@@ -106,6 +106,38 @@ def type_text(text):
         subprocess.run(["xdotool", "type", "--clearmodifiers", text])
 
 
+def get_audio_recorder():
+    """Determine which audio recorder to use: pw-record (PipeWire) or arecord (ALSA)."""
+    if subprocess.run(["which", "pw-record"], capture_output=True).returncode == 0:
+        return "pipewire"
+    elif subprocess.run(["which", "arecord"], capture_output=True).returncode == 0:
+        return "alsa"
+    return None
+
+
+def get_record_command(output_file):
+    """Get the command to record audio to the specified file."""
+    recorder = get_audio_recorder()
+    if recorder == "pipewire":
+        return [
+            "pw-record",
+            "--format", "s16",      # 16-bit signed
+            "--rate", "16000",      # Sample rate: 16kHz (what Whisper expects)
+            "--channels", "1",      # Mono
+            output_file
+        ]
+    else:
+        # ALSA fallback
+        return [
+            "arecord",
+            "-f", "S16_LE",         # Format: 16-bit little-endian
+            "-r", "16000",          # Sample rate: 16kHz (what Whisper expects)
+            "-c", "1",              # Mono
+            "-t", "wav",
+            output_file
+        ]
+
+
 class Dictation:
     def __init__(self):
         self.recording = False
@@ -160,16 +192,10 @@ class Dictation:
         self.temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         self.temp_file.close()
 
-        # Record using arecord (ALSA) - works on most Linux systems
+        # Record using pw-record (PipeWire) or arecord (ALSA)
+        record_cmd = get_record_command(self.temp_file.name)
         self.record_process = subprocess.Popen(
-            [
-                "arecord",
-                "-f", "S16_LE",  # Format: 16-bit little-endian
-                "-r", "16000",   # Sample rate: 16kHz (what Whisper expects)
-                "-c", "1",       # Mono
-                "-t", "wav",
-                self.temp_file.name
-            ],
+            record_cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -256,8 +282,9 @@ def check_dependencies():
     """Check that required system commands are available."""
     missing = []
 
-    if subprocess.run(["which", "arecord"], capture_output=True).returncode != 0:
-        missing.append(("arecord", "alsa-utils"))
+    # Check for audio recorder (pw-record or arecord)
+    if get_audio_recorder() is None:
+        missing.append(("pw-record or arecord", "pipewire or alsa-utils"))
 
     if AUTO_TYPE:
         if os.environ.get("WAYLAND_DISPLAY"):
