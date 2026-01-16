@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 
 import evdev
-from evdev import ecodes
+from evdev import ecodes, UInput
 from faster_whisper import WhisperModel
 
 __version__ = "0.1.0"
@@ -42,6 +42,7 @@ def load_config():
         "key": "f12",
         "auto_type": "true",
         "notifications": "true",
+        "grab_keyboard": "false",
     }
 
     if CONFIG_PATH.exists():
@@ -56,6 +57,7 @@ def load_config():
         "key": config.get("hotkey", "key", fallback=defaults["key"]),
         "auto_type": config.getboolean("behavior", "auto_type", fallback=True),
         "notifications": config.getboolean("behavior", "notifications", fallback=True),
+        "grab_keyboard": config.getboolean("behavior", "grab_keyboard", fallback=False),
     }
 
 
@@ -120,6 +122,7 @@ DEVICE = CONFIG["device"]
 COMPUTE_TYPE = CONFIG["compute_type"]
 AUTO_TYPE = CONFIG["auto_type"]
 NOTIFICATIONS = CONFIG["notifications"]
+GRAB_KEYBOARD = CONFIG["grab_keyboard"]
 
 
 def copy_to_clipboard(text):
@@ -217,8 +220,35 @@ def find_keyboards():
     return keyboards
 
 
+def create_uinput(keyboards):
+    """Create a virtual keyboard that can re-inject events."""
+    # Collect all capabilities from all keyboards
+    all_caps = {}
+    for kb in keyboards:
+        caps = kb.capabilities()
+        for event_type, codes in caps.items():
+            if event_type == ecodes.EV_SYN:
+                continue  # Skip EV_SYN, it's added automatically
+            if event_type not in all_caps:
+                all_caps[event_type] = set()
+            if isinstance(codes, list):
+                # For EV_KEY and similar, codes is a list of key codes
+                for code in codes:
+                    if isinstance(code, tuple):
+                        all_caps[event_type].add(code[0])
+                    else:
+                        all_caps[event_type].add(code)
+            else:
+                all_caps[event_type].add(codes)
+
+    # Convert sets to lists for UInput
+    caps_for_uinput = {k: list(v) for k, v in all_caps.items()}
+
+    return UInput(caps_for_uinput, name="SoupaWhisper Virtual Keyboard")
+
+
 class Dictation:
-    def __init__(self):
+    def __init__(self, grab=False):
         self.recording = False
         self.record_process = None
         self.temp_file = None
@@ -228,6 +258,8 @@ class Dictation:
         self.running = True
         self.keyboards = []
         self.selector = None
+        self.uinput = None
+        self.grab = grab
 
         # Load model in background
         print(f"Loading Whisper model ({MODEL_SIZE})...")
@@ -249,7 +281,8 @@ class Dictation:
             print(f"Failed to load model: {e}")
             if "cudnn" in str(e).lower() or "cuda" in str(e).lower():
                 print(
-                    "Hint: Try setting device = cpu in your config, or install cuDNN (NVIDIA) / ROCm (AMD)."
+                    "Hint: Try setting device = cpu in your config, "
+                    "or install cuDNN (NVIDIA) / ROCm (AMD)."
                 )
 
     def notify(self, title, message, icon="dialog-information", timeout=2000):
@@ -359,18 +392,40 @@ class Dictation:
             if self.temp_file and os.path.exists(self.temp_file.name):
                 os.unlink(self.temp_file.name)
 
-    def on_key_event(self, event):
-        """Handle a key event from evdev."""
-        if event.code == HOTKEY:
+    def handle_event(self, event):
+        """Handle an input event - suppress hotkey if grabbing, forward everything else."""
+        if event.type == ecodes.EV_KEY and event.code == HOTKEY:
+            # This is our hotkey - handle it and DON'T forward
             if event.value == 1:  # Key press
                 self.start_recording()
             elif event.value == 0:  # Key release
                 self.stop_recording()
             # value == 2 is key repeat, ignore it
+            return
+
+        # Forward all other events to the virtual keyboard (only if grabbing)
+        if self.grab and self.uinput:
+            self.uinput.write_event(event)
+            if event.type != ecodes.EV_SYN:
+                # Send a SYN event after each non-SYN event
+                self.uinput.syn()
+
+    def cleanup(self):
+        """Release grabbed devices and close uinput."""
+        if self.grab:
+            for kb in self.keyboards:
+                try:
+                    kb.ungrab()
+                    logger.debug(f"Ungrabbed: {kb.name}")
+                except OSError:
+                    pass
+            if self.uinput:
+                self.uinput.close()
 
     def stop(self):
         print("\nExiting...")
         self.running = False
+        self.cleanup()
         # Force immediate termination (evdev's select loop blocks signals)
         os.kill(os.getpid(), signal.SIGKILL)
 
@@ -382,7 +437,30 @@ class Dictation:
             print("Then log out and back in.")
             sys.exit(1)
 
-        print(f"Monitoring {len(self.keyboards)} keyboard(s)...")
+        if self.grab:
+            # Create virtual keyboard for re-injecting non-hotkey events
+            try:
+                self.uinput = create_uinput(self.keyboards)
+                logger.debug(f"Created virtual keyboard: {self.uinput.name}")
+            except OSError as e:
+                print(f"Error creating virtual keyboard: {e}")
+                print("Make sure /dev/uinput is accessible.")
+                print("Try: sudo modprobe uinput")
+                sys.exit(1)
+
+            # Grab all keyboards exclusively
+            for kb in self.keyboards:
+                try:
+                    kb.grab()
+                    logger.debug(f"Grabbed: {kb.name}")
+                except OSError as e:
+                    print(f"Warning: Could not grab {kb.name}: {e}")
+
+            print(
+                f"Monitoring {len(self.keyboards)} keyboard(s) with hotkey suppression..."
+            )
+        else:
+            print(f"Monitoring {len(self.keyboards)} keyboard(s)...")
         for kb in self.keyboards:
             logger.debug(f"  {kb.name}")
 
@@ -390,17 +468,19 @@ class Dictation:
         for kb in self.keyboards:
             self.selector.register(kb, selectors.EVENT_READ)
 
-        while self.running:
-            for key, mask in self.selector.select(timeout=1):
-                device = key.fileobj
-                try:
-                    for event in device.read():
-                        if event.type == ecodes.EV_KEY:
-                            self.on_key_event(event)
-                except OSError:
-                    # Device disconnected
-                    logger.debug(f"Device disconnected: {device.name}")
-                    self.selector.unregister(device)
+        try:
+            while self.running:
+                for key, mask in self.selector.select(timeout=1):
+                    device = key.fileobj
+                    try:
+                        for event in device.read():
+                            self.handle_event(event)
+                    except OSError:
+                        # Device disconnected
+                        logger.debug(f"Device disconnected: {device.name}")
+                        self.selector.unregister(device)
+        finally:
+            self.cleanup()
 
 
 def check_dependencies():
@@ -467,10 +547,11 @@ def main():
     logger.debug(
         f"Hotkey: {CONFIG['key']}, Auto-type: {AUTO_TYPE}, Notifications: {NOTIFICATIONS}"
     )
+    logger.debug(f"Grab keyboard: {GRAB_KEYBOARD}")
 
     check_dependencies()
 
-    dictation = Dictation()
+    dictation = Dictation(grab=GRAB_KEYBOARD)
 
     # Handle Ctrl+C gracefully
     def handle_sigint(sig, frame):

@@ -143,12 +143,45 @@ auto_type = true
 
 # Show desktop notification
 notifications = true
+
+# Grab keyboard to suppress hotkey from reaching other apps
+grab_keyboard = false
 ```
 
 Create the config directory and file if it doesn't exist:
 ```bash
 mkdir -p ~/.config/soupawhisper
 cp /path/to/soupawhisper/config.example.ini ~/.config/soupawhisper/config.ini
+```
+
+## Permissions
+
+SoupaWhisper requires access to input devices for keyboard monitoring.
+
+### Input Group (Required)
+
+Your user must be in the `input` group to read keyboard events:
+
+```bash
+sudo usermod -aG input $USER
+# Log out and back in for the change to take effect
+```
+
+### Hotkey Suppression (Optional)
+
+If you enable `grab_keyboard = true` to prevent the hotkey from reaching other apps, you also need access to `/dev/uinput`:
+
+```bash
+# Load the uinput module
+sudo modprobe uinput
+
+# To load automatically on boot, add to /etc/modules-load.d/
+echo uinput | sudo tee /etc/modules-load.d/uinput.conf
+
+# Grant access to uinput (add udev rule for persistence)
+echo 'KERNEL=="uinput", MODE="0660", GROUP="input"' | sudo tee /etc/udev/rules.d/99-uinput.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
 ```
 
 ## Troubleshooting
@@ -169,12 +202,12 @@ pw-record --format s16 --rate 16000 --channels 1 test.wav
 arecord -d 3 test.wav && aplay test.wav
 ```
 
-**Permission issues with keyboard (required for Wayland):**
+**Permission issues with keyboard:**
 ```bash
 sudo usermod -aG input $USER
 # Then log out and back in
 ```
-On Wayland, pynput requires access to /dev/input devices. Adding your user to the `input` group is required.
+SoupaWhisper uses evdev for keyboard monitoring, which requires access to `/dev/input` devices. See the Permissions section above.
 
 **GPU errors (cuDNN/ROCm):**
 ```
