@@ -56,13 +56,13 @@ install_python() {
     echo ""
     echo "Installing Python dependencies..."
 
-    if ! command -v poetry &> /dev/null; then
-        echo "Poetry not found. Please install Poetry first:"
-        echo "  curl -sSL https://install.python-poetry.org | python3 -"
+    if ! command -v uv &> /dev/null; then
+        echo "uv not found. Please install uv first:"
+        echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
         exit 1
     fi
 
-    poetry install
+    uv sync
 }
 
 # Setup config file
@@ -93,7 +93,7 @@ install_service() {
 
     # Check if venv exists
     if [ ! -d "$venv_path" ]; then
-        venv_path=$(poetry env info --path 2>/dev/null || echo "$SCRIPT_DIR/.venv")
+        venv_path="$SCRIPT_DIR/.venv"
     fi
 
     cat > "$SERVICE_DIR/soupawhisper.service" << EOF
@@ -155,7 +155,7 @@ main() {
     echo "==================================="
     echo ""
     echo "To run manually:"
-    echo "  poetry run python dictate.py"
+    echo "  uv run python dictate.py"
     echo ""
     echo "Config: $CONFIG_DIR/config.ini"
     echo "Hotkey: F12 (hold to record)"

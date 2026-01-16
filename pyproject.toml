@@ -1,11 +1,11 @@
-[tool.poetry]
+[project]
 name = "soupawhisper"
 version = "0.1.0"
 description = "Push-to-talk voice dictation for Linux using faster-whisper"
-authors = ["Kyle <kyle@ksred.com>"]
-license = "MIT"
+authors = [{ name = "Kyle", email = "kyle@ksred.com" }]
+license = { text = "MIT" }
 readme = "README.md"
-repository = "https://github.com/ksred/soupawhisper"
+requires-python = ">=3.10,<3.14"
 keywords = ["whisper", "dictation", "voice", "transcription", "speech-to-text"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -16,15 +16,20 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio :: Speech",
 ]
-package-mode = false
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "pynput>=1.7.6",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-faster-whisper = "^1.0.0"
-pynput = "^1.7.6"
+[project.urls]
+Repository = "https://github.com/ksred/soupawhisper"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["dictate.py"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -10,13 +10,13 @@ SoupaWhisper is a push-to-talk voice dictation tool for Linux using faster-whisp
 
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
 # Run the application
-poetry run python dictate.py
+uv run python dictate.py
 
 # Run with version info
-poetry run python dictate.py -v
+uv run python dictate.py -v
 ```
 
 ## Architecture

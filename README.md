@@ -5,7 +5,7 @@ A simple push-to-talk voice dictation tool for Linux using faster-whisper. Hold 
 ## Requirements
 
 - Python 3.10+
-- Poetry
+- uv
 - Linux with X11 (ALSA audio)
 
 ## Supported Distros
@@ -44,7 +44,7 @@ sudo dnf install alsa-utils xclip xdotool libnotify
 sudo pacman -S alsa-utils xclip xdotool libnotify
 
 # Then install Python deps
-poetry install
+uv sync
 ```
 
 ### GPU Support (Optional)
@@ -67,7 +67,7 @@ compute_type = float16
 ## Usage
 
 ```bash
-poetry run python dictate.py
+uv run python dictate.py
 ```
 
 - Hold **F12** to record
