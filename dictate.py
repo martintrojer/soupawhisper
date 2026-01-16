@@ -96,6 +96,16 @@ def copy_to_clipboard(text):
             process.communicate(input=text.encode())
 
 
+def type_text(text):
+    """Type text into the active input field using wtype (Wayland) or xdotool (X11)."""
+    if os.environ.get("WAYLAND_DISPLAY"):
+        # Wayland: use wtype
+        subprocess.run(["wtype", text])
+    else:
+        # X11: use xdotool
+        subprocess.run(["xdotool", "type", "--clearmodifiers", text])
+
+
 class Dictation:
     def __init__(self):
         self.recording = False
@@ -205,7 +215,7 @@ class Dictation:
 
                 # Type it into the active input field
                 if AUTO_TYPE:
-                    subprocess.run(["xdotool", "type", "--clearmodifiers", text])
+                    type_text(text)
 
                 print(f"Copied: {text}")
                 self.notify("Copied!", text[:100] + ("..." if len(text) > 100 else ""), "emblem-ok-symbolic", 3000)
@@ -250,8 +260,14 @@ def check_dependencies():
         missing.append(("arecord", "alsa-utils"))
 
     if AUTO_TYPE:
-        if subprocess.run(["which", "xdotool"], capture_output=True).returncode != 0:
-            missing.append(("xdotool", "xdotool"))
+        if os.environ.get("WAYLAND_DISPLAY"):
+            # Wayland: need wtype
+            if subprocess.run(["which", "wtype"], capture_output=True).returncode != 0:
+                missing.append(("wtype", "wtype"))
+        else:
+            # X11: need xdotool
+            if subprocess.run(["which", "xdotool"], capture_output=True).returncode != 0:
+                missing.append(("xdotool", "xdotool"))
 
     if missing:
         print("Missing dependencies:")

@@ -33,8 +33,9 @@ This is a single-file Python application (`dictate.py`) with approximately 270 l
 
 - `faster-whisper`: Whisper model for speech-to-text transcription
 - `pynput`: Global keyboard listener for hotkey detection
-- System tools: `arecord` (ALSA recording), `xdotool` (auto-typing), `notify-send` (notifications)
-- Clipboard: OSC52 escape sequences (primary), with fallback to `xclip` (X11) or `wl-copy` (Wayland)
+- System tools: `arecord` (ALSA recording), `notify-send` (notifications)
+- Auto-typing: `wtype` (Wayland) or `xdotool` (X11)
+- Clipboard: OSC52 escape sequences (primary), with fallback to `wl-copy` (Wayland) or `xclip` (X11)
 
 **Flow:**
 

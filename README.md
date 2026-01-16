@@ -4,9 +4,9 @@ A simple push-to-talk voice dictation tool for Linux using faster-whisper. Hold 
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10-3.13
 - uv
-- Linux with X11 (ALSA audio)
+- Linux with X11 or Wayland (ALSA audio)
 
 ## Supported Distros
 
@@ -35,19 +35,19 @@ The installer will:
 
 ```bash
 # Ubuntu/Debian
-sudo apt install alsa-utils xdotool libnotify-bin xclip wl-clipboard
+sudo apt install alsa-utils libnotify-bin xdotool xclip wtype wl-clipboard
 
 # Fedora
-sudo dnf install alsa-utils xdotool libnotify xclip wl-clipboard
+sudo dnf install alsa-utils libnotify xdotool xclip wtype wl-clipboard
 
 # Arch
-sudo pacman -S alsa-utils xdotool libnotify xclip wl-clipboard
+sudo pacman -S alsa-utils libnotify xdotool xclip wtype wl-clipboard
 
 # Then install Python deps
 uv sync
 ```
 
-Note: xclip is for X11, wl-clipboard is for Wayland. Install both for maximum compatibility, or just the one for your display server.
+Note: xdotool and xclip are for X11, wtype and wl-clipboard are for Wayland. Install all for maximum compatibility, or just the ones for your display server.
 
 ### GPU Support (Optional)
 
@@ -162,11 +162,12 @@ arecord -l
 arecord -d 3 test.wav && aplay test.wav
 ```
 
-**Permission issues with keyboard:**
+**Permission issues with keyboard (required for Wayland):**
 ```bash
 sudo usermod -aG input $USER
 # Then log out and back in
 ```
+On Wayland, pynput requires access to /dev/input devices. Adding your user to the `input` group is required.
 
 **GPU errors (cuDNN/ROCm):**
 ```
