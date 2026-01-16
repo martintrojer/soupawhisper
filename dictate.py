@@ -8,6 +8,7 @@ import argparse
 import base64
 import configparser
 import logging
+import selectors
 import subprocess
 import tempfile
 import threading
@@ -16,7 +17,8 @@ import sys
 import os
 from pathlib import Path
 
-from pynput import keyboard
+import evdev
+from evdev import ecodes
 from faster_whisper import WhisperModel
 
 __version__ = "0.1.0"
@@ -61,16 +63,42 @@ def load_config():
 CONFIG = load_config()
 
 
+# Map key names to evdev key codes
+KEY_MAP = {
+    "f1": ecodes.KEY_F1, "f2": ecodes.KEY_F2, "f3": ecodes.KEY_F3, "f4": ecodes.KEY_F4,
+    "f5": ecodes.KEY_F5, "f6": ecodes.KEY_F6, "f7": ecodes.KEY_F7, "f8": ecodes.KEY_F8,
+    "f9": ecodes.KEY_F9, "f10": ecodes.KEY_F10, "f11": ecodes.KEY_F11, "f12": ecodes.KEY_F12,
+    "scroll_lock": ecodes.KEY_SCROLLLOCK, "pause": ecodes.KEY_PAUSE,
+    "insert": ecodes.KEY_INSERT, "home": ecodes.KEY_HOME, "end": ecodes.KEY_END,
+    "pageup": ecodes.KEY_PAGEUP, "pagedown": ecodes.KEY_PAGEDOWN,
+    "capslock": ecodes.KEY_CAPSLOCK, "numlock": ecodes.KEY_NUMLOCK,
+}
+
+
 def get_hotkey(key_name):
-    """Map key name to pynput key."""
+    """Map key name to evdev key code."""
     key_name = key_name.lower()
-    if hasattr(keyboard.Key, key_name):
-        return getattr(keyboard.Key, key_name)
+    if key_name in KEY_MAP:
+        return KEY_MAP[key_name]
     elif len(key_name) == 1:
-        return keyboard.KeyCode.from_char(key_name)
-    else:
-        print(f"Unknown key: {key_name}, defaulting to f12")
-        return keyboard.Key.f12
+        # Single character keys (a-z, 0-9)
+        key_attr = f"KEY_{key_name.upper()}"
+        if hasattr(ecodes, key_attr):
+            return getattr(ecodes, key_attr)
+    print(f"Unknown key: {key_name}, defaulting to f12")
+    return ecodes.KEY_F12
+
+
+def get_key_name(keycode):
+    """Get human-readable name for a key code."""
+    for name, code in KEY_MAP.items():
+        if code == keycode:
+            return name.upper()
+    # Try to get from ecodes
+    name = ecodes.KEY.get(keycode, f"KEY_{keycode}")
+    if isinstance(name, list):
+        name = name[0]
+    return name.replace("KEY_", "")
 
 
 HOTKEY = get_hotkey(CONFIG["key"])
@@ -151,6 +179,25 @@ def get_record_command(output_file):
         ]
 
 
+def find_keyboards():
+    """Find all keyboard input devices."""
+    keyboards = []
+    for path in evdev.list_devices():
+        try:
+            device = evdev.InputDevice(path)
+            caps = device.capabilities()
+            # Check if device has EV_KEY capability with typical keyboard keys
+            if ecodes.EV_KEY in caps:
+                keys = caps[ecodes.EV_KEY]
+                # Check for common keyboard keys (KEY_A = 30, KEY_SPACE = 57)
+                if ecodes.KEY_A in keys or ecodes.KEY_SPACE in keys:
+                    keyboards.append(device)
+                    logger.debug(f"Found keyboard: {device.path} - {device.name}")
+        except (PermissionError, OSError) as e:
+            logger.debug(f"Cannot access {path}: {e}")
+    return keyboards
+
+
 class Dictation:
     def __init__(self):
         self.recording = False
@@ -160,7 +207,8 @@ class Dictation:
         self.model_loaded = threading.Event()
         self.model_error = None
         self.running = True
-        self.listener = None
+        self.keyboards = []
+        self.selector = None
 
         # Load model in background
         print(f"Loading Whisper model ({MODEL_SIZE})...")
@@ -170,7 +218,7 @@ class Dictation:
         try:
             self.model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
             self.model_loaded.set()
-            hotkey_name = HOTKEY.name if hasattr(HOTKEY, 'name') else HOTKEY.char
+            hotkey_name = get_key_name(HOTKEY)
             print(f"Model loaded. Ready for dictation!")
             print(f"Hold [{hotkey_name}] to record, release to transcribe.")
             print("Press Ctrl+C to quit.")
@@ -215,8 +263,8 @@ class Dictation:
             stderr=subprocess.DEVNULL
         )
         print("Recording...")
-        hotkey_name = HOTKEY.name if hasattr(HOTKEY, 'name') else HOTKEY.char
-        self.notify("Recording...", f"Release {hotkey_name.upper()} when done", "audio-input-microphone", 30000)
+        hotkey_name = get_key_name(HOTKEY)
+        self.notify("Recording...", f"Release {hotkey_name} when done", "audio-input-microphone", 30000)
 
     def stop_recording(self):
         if not self.recording:
@@ -272,29 +320,48 @@ class Dictation:
             if self.temp_file and os.path.exists(self.temp_file.name):
                 os.unlink(self.temp_file.name)
 
-    def on_press(self, key):
-        if key == HOTKEY:
-            self.start_recording()
-
-    def on_release(self, key):
-        if key == HOTKEY:
-            self.stop_recording()
+    def on_key_event(self, event):
+        """Handle a key event from evdev."""
+        if event.code == HOTKEY:
+            if event.value == 1:  # Key press
+                self.start_recording()
+            elif event.value == 0:  # Key release
+                self.stop_recording()
+            # value == 2 is key repeat, ignore it
 
     def stop(self):
         print("\nExiting...")
         self.running = False
-        if self.listener:
-            self.listener.stop()
-        # Force immediate termination
+        # Force immediate termination (evdev's select loop blocks signals)
         os.kill(os.getpid(), signal.SIGKILL)
 
     def run(self):
-        self.listener = keyboard.Listener(
-            on_press=self.on_press,
-            on_release=self.on_release
-        )
-        self.listener.start()
-        self.listener.join()
+        self.keyboards = find_keyboards()
+        if not self.keyboards:
+            print("Error: No keyboards found!")
+            print("Make sure you're in the 'input' group: sudo usermod -aG input $USER")
+            print("Then log out and back in.")
+            sys.exit(1)
+
+        print(f"Monitoring {len(self.keyboards)} keyboard(s)...")
+        for kb in self.keyboards:
+            logger.debug(f"  {kb.name}")
+
+        self.selector = selectors.DefaultSelector()
+        for kb in self.keyboards:
+            self.selector.register(kb, selectors.EVENT_READ)
+
+        while self.running:
+            for key, mask in self.selector.select(timeout=1):
+                device = key.fileobj
+                try:
+                    for event in device.read():
+                        if event.type == ecodes.EV_KEY:
+                            self.on_key_event(event)
+                except OSError:
+                    # Device disconnected
+                    logger.debug(f"Device disconnected: {device.name}")
+                    self.selector.unregister(device)
 
 
 def check_dependencies():
