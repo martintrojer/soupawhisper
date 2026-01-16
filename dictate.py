@@ -5,7 +5,6 @@ Hold the hotkey to record, release to transcribe and copy to clipboard.
 """
 
 import argparse
-import base64
 import configparser
 import logging
 import selectors
@@ -126,28 +125,17 @@ GRAB_KEYBOARD = CONFIG["grab_keyboard"]
 
 
 def copy_to_clipboard(text):
-    """Copy text to clipboard using OSC52, then fallback to wl-copy or xclip."""
-    # Try OSC52 first (works in terminals that support it)
-    encoded = base64.b64encode(text.encode()).decode()
-    sys.stdout.write(f"\033]52;c;{encoded}\007")
-    sys.stdout.flush()
-    logger.debug("Copied to clipboard via OSC52")
-
-    # Also copy via native clipboard tools for non-terminal contexts
+    """Copy text to clipboard using wl-copy (Wayland) or xclip (X11)."""
     if os.environ.get("WAYLAND_DISPLAY"):
-        # Wayland: use wl-copy
-        if subprocess.run(["which", "wl-copy"], capture_output=True).returncode == 0:
-            logger.debug("Running: wl-copy")
-            process = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
-            process.communicate(input=text.encode())
+        logger.debug("Running: wl-copy")
+        process = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
+        process.communicate(input=text.encode())
     elif os.environ.get("DISPLAY"):
-        # X11: use xclip
-        if subprocess.run(["which", "xclip"], capture_output=True).returncode == 0:
-            logger.debug("Running: xclip -selection clipboard")
-            process = subprocess.Popen(
-                ["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE
-            )
-            process.communicate(input=text.encode())
+        logger.debug("Running: xclip -selection clipboard")
+        process = subprocess.Popen(
+            ["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE
+        )
+        process.communicate(input=text.encode())
 
 
 def type_text(text):

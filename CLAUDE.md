@@ -46,7 +46,7 @@ This is a single-file Python application (`dictate.py`) with approximately 350 l
 - `evdev`: Direct Linux input device access for hotkey detection (requires user to be in `input` group)
 - System tools: `pw-record` (PipeWire) or `arecord` (ALSA fallback), `notify-send` (notifications)
 - Auto-typing: `wtype` (Wayland) or `xdotool` (X11)
-- Clipboard: OSC52 escape sequences (primary), with fallback to `wl-copy` (Wayland) or `xclip` (X11)
+- Clipboard: `wl-copy` (Wayland) or `xclip` (X11)
 
 **Flow:**
 
