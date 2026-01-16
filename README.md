@@ -122,7 +122,8 @@ Edit `~/.config/soupawhisper/config.ini`:
 
 ```ini
 [whisper]
-# Model size: tiny.en, base.en, small.en, medium.en, large-v3
+# Model: size name (tiny.en, base.en, small.en, medium.en, large-v3)
+# or a Hugging Face model ID (e.g., Systran/faster-distil-whisper-large-v3)
 model = base.en
 
 # Device: cpu or cuda
