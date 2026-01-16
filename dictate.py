@@ -147,6 +147,7 @@ class Dictation:
         self.model_loaded = threading.Event()
         self.model_error = None
         self.running = True
+        self.listener = None
 
         # Load model in background
         print(f"Loading Whisper model ({MODEL_SIZE})...")
@@ -268,14 +269,18 @@ class Dictation:
     def stop(self):
         print("\nExiting...")
         self.running = False
-        os._exit(0)
+        if self.listener:
+            self.listener.stop()
+        # Force immediate termination
+        os.kill(os.getpid(), signal.SIGKILL)
 
     def run(self):
-        with keyboard.Listener(
+        self.listener = keyboard.Listener(
             on_press=self.on_press,
             on_release=self.on_release
-        ) as listener:
-            listener.join()
+        )
+        self.listener.start()
+        self.listener.join()
 
 
 def check_dependencies():
