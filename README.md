@@ -51,7 +51,11 @@ Note: xclip is for X11, wl-clipboard is for Wayland. Install both for maximum co
 
 ### GPU Support (Optional)
 
-For NVIDIA GPU acceleration, install cuDNN 9:
+By default, SoupaWhisper runs on CPU which works well on modern Intel/AMD processors. GPU acceleration is optional and requires additional setup.
+
+#### NVIDIA GPU (CUDA)
+
+Install cuDNN 9:
 
 ```bash
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
@@ -65,6 +69,24 @@ Then edit `~/.config/soupawhisper/config.ini`:
 device = cuda
 compute_type = float16
 ```
+
+#### AMD GPU (ROCm)
+
+Install ROCm and the ROCm-compatible CTranslate2:
+
+```bash
+# Install ROCm (see https://rocm.docs.amd.com for your distro)
+# Then install ctranslate2 with ROCm support
+pip install ctranslate2 --extra-index-url https://download.pytorch.org/whl/rocm6.0
+```
+
+Then edit `~/.config/soupawhisper/config.ini`:
+```ini
+device = cuda
+compute_type = float16
+```
+
+Note: ROCm uses the same `device = cuda` setting as it provides CUDA compatibility.
 
 ## Usage
 
@@ -103,7 +125,9 @@ Edit `~/.config/soupawhisper/config.ini`:
 # Model size: tiny.en, base.en, small.en, medium.en, large-v3
 model = base.en
 
-# Device: cpu or cuda (cuda requires cuDNN)
+# Device: cpu or cuda
+# cpu - Works on all systems, optimized for Intel/AMD processors
+# cuda - NVIDIA GPU (requires cuDNN) or AMD GPU (requires ROCm)
 device = cpu
 
 # Compute type: int8 for CPU, float16 for GPU
@@ -144,11 +168,13 @@ sudo usermod -aG input $USER
 # Then log out and back in
 ```
 
-**cuDNN errors with GPU:**
+**GPU errors (cuDNN/ROCm):**
 ```
 Unable to load any of {libcudnn_ops.so.9...}
 ```
-Install cuDNN 9 (see GPU Support section above) or switch to CPU mode.
+For NVIDIA: Install cuDNN 9 (see GPU Support section above).
+For AMD: Ensure ROCm is properly installed.
+Or switch to CPU mode (`device = cpu` in config).
 
 ## Model Sizes
 

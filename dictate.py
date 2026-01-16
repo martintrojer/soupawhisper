@@ -123,7 +123,7 @@ class Dictation:
             self.model_loaded.set()
             print(f"Failed to load model: {e}")
             if "cudnn" in str(e).lower() or "cuda" in str(e).lower():
-                print("Hint: Try setting device = cpu in your config, or install cuDNN.")
+                print("Hint: Try setting device = cpu in your config, or install cuDNN (NVIDIA) / ROCm (AMD).")
 
     def notify(self, title, message, icon="dialog-information", timeout=2000):
         """Send a desktop notification."""
