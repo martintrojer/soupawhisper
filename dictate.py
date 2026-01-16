@@ -7,6 +7,7 @@ Hold the hotkey to record, release to transcribe and copy to clipboard.
 import argparse
 import base64
 import configparser
+import logging
 import subprocess
 import tempfile
 import threading
@@ -19,6 +20,13 @@ from pynput import keyboard
 from faster_whisper import WhisperModel
 
 __version__ = "0.1.0"
+
+# Setup logging
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # Load configuration
 CONFIG_PATH = Path.home() / ".config" / "soupawhisper" / "config.ini"
@@ -79,16 +87,19 @@ def copy_to_clipboard(text):
     encoded = base64.b64encode(text.encode()).decode()
     sys.stdout.write(f"\033]52;c;{encoded}\007")
     sys.stdout.flush()
+    logger.debug("Copied to clipboard via OSC52")
 
     # Also copy via native clipboard tools for non-terminal contexts
     if os.environ.get("WAYLAND_DISPLAY"):
         # Wayland: use wl-copy
         if subprocess.run(["which", "wl-copy"], capture_output=True).returncode == 0:
+            logger.debug("Running: wl-copy")
             process = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
             process.communicate(input=text.encode())
     elif os.environ.get("DISPLAY"):
         # X11: use xclip
         if subprocess.run(["which", "xclip"], capture_output=True).returncode == 0:
+            logger.debug("Running: xclip -selection clipboard")
             process = subprocess.Popen(
                 ["xclip", "-selection", "clipboard"],
                 stdin=subprocess.PIPE
@@ -100,9 +111,11 @@ def type_text(text):
     """Type text into the active input field using wtype (Wayland) or xdotool (X11)."""
     if os.environ.get("WAYLAND_DISPLAY"):
         # Wayland: use wtype
+        logger.debug("Running: wtype <text>")
         subprocess.run(["wtype", text])
     else:
         # X11: use xdotool
+        logger.debug("Running: xdotool type --clearmodifiers <text>")
         subprocess.run(["xdotool", "type", "--clearmodifiers", text])
 
 
@@ -195,6 +208,7 @@ class Dictation:
 
         # Record using pw-record (PipeWire) or arecord (ALSA)
         record_cmd = get_record_command(self.temp_file.name)
+        logger.debug(f"Running: {' '.join(record_cmd)}")
         self.record_process = subprocess.Popen(
             record_cmd,
             stdout=subprocess.DEVNULL,
@@ -317,13 +331,29 @@ def main():
         action="version",
         version=f"SoupaWhisper {__version__}"
     )
-    parser.parse_args()
+    parser.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug logging"
+    )
+    args = parser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
 
     print(f"SoupaWhisper v{__version__}")
     if CONFIG_PATH.exists():
         print(f"Config: {CONFIG_PATH}")
     else:
         print(f"Config: using defaults (create {CONFIG_PATH} to customize)")
+
+    # Log environment detection
+    display_server = "Wayland" if os.environ.get("WAYLAND_DISPLAY") else "X11" if os.environ.get("DISPLAY") else "Unknown"
+    audio_backend = get_audio_recorder() or "None"
+    logger.debug(f"Display server: {display_server}")
+    logger.debug(f"Audio backend: {audio_backend}")
+    logger.debug(f"Model: {MODEL_SIZE}, Device: {DEVICE}, Compute: {COMPUTE_TYPE}")
+    logger.debug(f"Hotkey: {CONFIG['key']}, Auto-type: {AUTO_TYPE}, Notifications: {NOTIFICATIONS}")
 
     check_dependencies()
 
