@@ -320,7 +320,10 @@ def main():
     parser.parse_args()
 
     print(f"SoupaWhisper v{__version__}")
-    print(f"Config: {CONFIG_PATH}")
+    if CONFIG_PATH.exists():
+        print(f"Config: {CONFIG_PATH}")
+    else:
+        print(f"Config: using defaults (create {CONFIG_PATH} to customize)")
 
     check_dependencies()
 
