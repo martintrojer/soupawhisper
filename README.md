@@ -1,5 +1,7 @@
 # SoupaWhisper
 
+> **⚠️ DEPRECATED**: This project is no longer maintained. I have moved on to [sensevoice-writer](https://github.com/martintrojer/sensevoice-writer).
+
 A simple push-to-talk voice dictation tool for Linux using faster-whisper. Hold a key to record, release to transcribe, and it automatically copies to clipboard and types into the active input.
 
 ## Requirements
